@@ -316,11 +316,38 @@
     box-shadow: 0 6px 20px rgba(0,168,122,0.3);
   }
 
-  .btn-stop {
-    background: linear-gradient(135deg, var(--warn) 0%, #e03030 100%);
-    color: #fff;
-    box-shadow: 0 8px 28px rgba(255,94,94,0.3);
+  .btn-pause {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #000;
+    box-shadow: 0 8px 28px rgba(245,158,11,0.3);
   }
+
+  .btn-resume {
+    background: linear-gradient(135deg, var(--accent) 0%, #00c87a 100%);
+    color: #000;
+    box-shadow: 0 8px 28px var(--shadow);
+  }
+
+  .btn-stop-dim {
+    width: 100%;
+    padding: 13px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,94,94,0.25);
+    background: transparent;
+    color: var(--warn);
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0.7;
+    display: none;
+  }
+
+  .btn-stop-dim:active { opacity: 1; background: rgba(255,94,94,0.08); }
+  .btn-stop-dim.visible { display: block; }
 
   .btn-secondary {
     background: var(--card);
@@ -418,6 +445,120 @@
     margin-top: 1px;
   }
 
+  /* ── CONFIRM MODAL ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 200;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .modal-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .modal-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 28px 28px 0 0;
+    padding: 32px 24px 40px;
+    width: 100%;
+    max-width: 420px;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .modal-overlay.show .modal-box {
+    transform: translateY(0);
+  }
+
+  .modal-pill {
+    width: 40px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 28px;
+  }
+
+  .modal-icon {
+    font-size: 36px;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+
+  .modal-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text);
+    text-align: center;
+    letter-spacing: -0.3px;
+    margin-bottom: 8px;
+  }
+
+  .modal-body {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.6;
+    margin-bottom: 28px;
+    letter-spacing: 0.2px;
+  }
+
+  .modal-body strong {
+    color: var(--warn);
+    font-weight: 700;
+  }
+
+  .modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .modal-btn-reset {
+    width: 100%;
+    padding: 16px;
+    border-radius: 16px;
+    border: none;
+    background: var(--warn);
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s;
+  }
+
+  .modal-btn-reset:active { transform: scale(0.97); opacity: 0.9; }
+
+  .modal-btn-cancel {
+    width: 100%;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.2s, border 0.2s;
+  }
+
+  .modal-btn-cancel:active { color: var(--text); }
+
   /* ── TOAST ── */
   .toast {
     position: fixed;
@@ -498,8 +639,9 @@
   </div>
 
   <div class="controls">
-    <button class="btn-main btn-start" id="mainBtn" onclick="toggleTracking()">▶ START</button>
-    <button class="btn-secondary" onclick="resetSession()">↺ Reset Session</button>
+    <button class="btn-main btn-start" id="mainBtn" onclick="handleMainBtn()">▶ START</button>
+    <button class="btn-stop-dim" id="stopBtn" onclick="handleStop()">⏹ End Run</button>
+    <button class="btn-secondary" onclick="openResetModal()">↺ Reset Session</button>
   </div>
 
   <div class="history-section">
@@ -507,6 +649,21 @@
     <div class="session-list" id="splitList"></div>
   </div>
 
+</div>
+
+<div class="modal-overlay" id="resetModal" onclick="handleOverlayClick(event)">
+  <div class="modal-box">
+    <div class="modal-pill"></div>
+    <div class="modal-icon">⚠️</div>
+    <div class="modal-title">Reset This Session?</div>
+    <div class="modal-body">
+      Your current run data, splits, and route will be <strong>permanently discarded</strong>.<br>This action cannot be undone.
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn-reset" onclick="confirmReset()">Yes, Reset Session</button>
+      <button class="modal-btn-cancel" onclick="closeModal()">No, Keep Running</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -538,18 +695,22 @@
 
   // ── TRACKER ──
   let isTracking = false;
-  let watchId = null;
-  let positions = [];
+  let isPaused   = false;
+  let watchId    = null;
+  let positions  = [];
   let totalDistance = 0;
-  let startTime = null;
+  let startTime     = null;   // wall-clock start
+  let pausedMs      = 0;      // total ms spent paused
+  let pauseStart    = null;   // when current pause began
   let timerInterval = null;
-  let splits = [];         // { km, splitMs, totalMs }
-  let lastSplitKm = 0;    // which km we last recorded a split for
-  let lastSplitTime = 0;  // timestamp when last split was recorded
+  let splits       = [];
+  let lastSplitKm  = 0;
+  let lastSplitTime = 0;
 
   const kmValueEl  = document.getElementById('kmValue');
   const paceEl     = document.getElementById('paceVal');
   const mainBtn    = document.getElementById('mainBtn');
+  const stopBtn    = document.getElementById('stopBtn');
   const statusDot  = document.getElementById('statusDot');
   const timerEl    = document.getElementById('timerDisplay');
   const routeEmpty = document.getElementById('routeEmpty');
@@ -558,37 +719,34 @@
   const canvas     = document.getElementById('routeCanvas');
   const ctx        = canvas.getContext('2d');
 
-  function resizeCanvas() {
-    const p = canvas.parentElement;
-    canvas.width = p.offsetWidth;
-    canvas.height = p.offsetHeight;
-    drawRoute();
-  }
-  window.addEventListener('resize', resizeCanvas);
-  setTimeout(resizeCanvas, 100);
-
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2500);
+  function activeMs() {
+    // elapsed ms excluding paused time
+    const paused = pausedMs + (isPaused ? Date.now() - pauseStart : 0);
+    return Date.now() - startTime - paused;
   }
 
-  function toggleTracking() {
-    if (!isTracking) startTracking(); else stopTracking();
+  function handleMainBtn() {
+    if (!isTracking && !isPaused) { startTracking(); return; }
+    if (isTracking && !isPaused)  { pauseTracking(); return; }
+    if (isPaused)                  { resumeTracking(); return; }
+  }
+
+  function handleStop() {
+    stopTracking();
   }
 
   function startTracking() {
     if (!navigator.geolocation) { showToast('GPS not available'); return; }
-    isTracking = true;
+    isTracking = true; isPaused = false;
     positions = []; totalDistance = 0;
     splits = []; lastSplitKm = 0; lastSplitTime = 0;
-    startTime = Date.now();
+    startTime = Date.now(); pausedMs = 0; pauseStart = null;
     document.getElementById('splitsHeader').style.display = 'none';
     document.getElementById('splitList').innerHTML = '';
 
-    mainBtn.textContent = '⏹ STOP';
-    mainBtn.className = 'btn-main btn-stop';
+    mainBtn.textContent = '⏸ PAUSE';
+    mainBtn.className = 'btn-main btn-pause';
+    stopBtn.classList.add('visible');
     statusDot.classList.add('active');
     timerEl.classList.add('running');
     gpsBar.classList.add('visible');
@@ -598,17 +756,46 @@
     watchId = navigator.geolocation.watchPosition(onPosition, onError, {
       enableHighAccuracy: true, maximumAge: 0, timeout: 15000
     });
-    showToast('Tracking started');
+    showToast('Run started');
+  }
+
+  function pauseTracking() {
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    clearInterval(timerInterval);
+    isPaused = true;
+    pauseStart = Date.now();
+    statusDot.classList.remove('active');
+    timerEl.classList.remove('running');
+    mainBtn.textContent = '▶ RESUME';
+    mainBtn.className = 'btn-main btn-resume';
+    showToast('Paused');
+  }
+
+  function resumeTracking() {
+    isPaused = false;
+    pausedMs += Date.now() - pauseStart;
+    pauseStart = null;
+    statusDot.classList.add('active');
+    timerEl.classList.add('running');
+    mainBtn.textContent = '⏸ PAUSE';
+    mainBtn.className = 'btn-main btn-pause';
+
+    timerInterval = setInterval(updateTimer, 1000);
+    watchId = navigator.geolocation.watchPosition(onPosition, onError, {
+      enableHighAccuracy: true, maximumAge: 0, timeout: 15000
+    });
+    showToast('Resumed');
   }
 
   function stopTracking() {
     if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
     clearInterval(timerInterval);
-    isTracking = false;
+    isTracking = false; isPaused = false;
     statusDot.classList.remove('active');
     timerEl.classList.remove('running');
     mainBtn.textContent = '▶ START';
     mainBtn.className = 'btn-main btn-start';
+    stopBtn.classList.remove('visible');
 
     if (totalDistance > 0.005) {
       showToast('Done · ' + totalDistance.toFixed(2) + ' km');
@@ -657,9 +844,8 @@
 
   function updateUI() {
     kmValueEl.textContent = totalDistance.toFixed(2);
-    // Pace = elapsed minutes / km
     if (totalDistance > 0.01 && startTime) {
-      const elapsedMin = (Date.now() - startTime) / 60000;
+      const elapsedMin = activeMs() / 60000;
       const paceMin = elapsedMin / totalDistance;
       const mins = Math.floor(paceMin);
       const secs = Math.round((paceMin - mins) * 60);
@@ -670,7 +856,7 @@
   }
 
   function updateTimer() {
-    const e = Math.floor((Date.now() - startTime) / 1000);
+    const e = Math.floor(activeMs() / 1000);
     const h = String(Math.floor(e/3600)).padStart(2,'0');
     const m = String(Math.floor((e%3600)/60)).padStart(2,'0');
     const s = String(e%60).padStart(2,'0');
@@ -678,20 +864,39 @@
   }
 
   function resetSession() {
-    if (isTracking) stopTracking();
+    if (isTracking || isPaused) stopTracking();
     totalDistance = 0;
     positions = []; startTime = null;
     splits = []; lastSplitKm = 0; lastSplitTime = 0;
+    pausedMs = 0; pauseStart = null; isPaused = false;
     timerEl.textContent = '00:00:00';
     timerEl.classList.remove('running');
     kmValueEl.textContent = '0.00';
     paceEl.textContent = '--:--';
     routeEmpty.style.display = 'flex';
     gpsBar.classList.remove('visible');
+    stopBtn.classList.remove('visible');
     document.getElementById('splitsHeader').style.display = 'none';
     document.getElementById('splitList').innerHTML = '';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    showToast('Reset');
+    showToast('Session reset');
+  }
+
+  function openResetModal() {
+    document.getElementById('resetModal').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('resetModal').classList.remove('show');
+  }
+
+  function confirmReset() {
+    closeModal();
+    resetSession();
+  }
+
+  function handleOverlayClick(e) {
+    if (e.target === document.getElementById('resetModal')) closeModal();
   }
 
   function getThemeColors() {
